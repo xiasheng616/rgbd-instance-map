@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.idea/
+.vscode/
+.env
+.env.*
+data/
+outputs/
+checkpoints/
+cache/
+*.pt
+*.pth
+*.safetensors
+*.onnx
+*.tgz
+*.tar
+*.tar.gz
+*.zip
+*.log
+*.ply
+*.pcd
+*.bag
+# Keep selected small illustrations and measured reports under assets/ and reports/.

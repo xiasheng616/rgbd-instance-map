@@ -1,0 +1,6 @@
+# Versions read from the existing local geometry environment on 2026-11-08.
+# Fresh-environment installation has not been verified.
+numpy==1.26.4
+scipy==1.13.0
+opencv-python==4.9.0.80
+open3d==0.20.0
