@@ -1,6 +1,5 @@
-from scipy.spatial.transform import Rotation
+from scipy.spatial.transform import Rotation, Slerp
 import numpy as np
-
 
 
 def pose_to_matrix(pose):
@@ -22,3 +21,28 @@ def transform_points(points, T):
     points_world = points @ R.T + t
 
     return points_world
+
+
+def interpolate_pose(timestamp, pose_timestamps, poses):
+    """返回查询时刻的 4×4 相机到世界变换 T_wc。"""
+
+    start_time = pose_timestamps[0]
+    end_time = pose_timestamps[-1]
+
+    if timestamp < start_time or timestamp > end_time:
+        raise ValueError("查询时间超出了参考位姿的时间范围")
+
+
+    x = np.interp(timestamp, pose_timestamps, poses[:, 0])
+    y = np.interp(timestamp, pose_timestamps, poses[:, 1])
+    z = np.interp(timestamp, pose_timestamps, poses[:, 2])
+
+    rotations = Rotation.from_quat(poses[:, 3:7])
+    slerp = Slerp(pose_timestamps, rotations)
+    R = slerp([timestamp]).as_matrix()[0]
+
+    T_wc = np.eye(4)
+    T_wc[:3,:3]=R
+    T_wc[:3, 3] = [x,y,z]
+
+    return T_wc
