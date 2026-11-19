@@ -2,7 +2,7 @@
 
 学习与工程实践项目：从 RGB-D 序列构建带稳定实例 ID 的三维物体地图，并支持简单文本检索。
 
-当前状态：第一关和第二关的基础实现与实验检查已完成，包括刚体拟合、点到点 ICP、真实帧对照、短序列累计、采样对照及换起点迁移。当前 ICP 基线存在明显累积漂移，成功对照与失败区间均保留；三维实例关联与检索为后续计划。
+第一关和第二关的基础实现与实验检查已完成，包括刚体拟合、点到点 ICP、真实帧对照、短序列累计、采样对照及换起点迁移。实验记录保留了 ICP 的对照结果和累积漂移较大的区间。第三关已通过 ARKitScenes 数据适配、逐帧点云导出、跨帧关联与命令行复现验收。当前进入第四关，从地图实例回查二维观测，为多视角特征提取准备输入。
 
 ![第一关：已知位姿融合地图与所选帧的相机中心轨迹](assets/stage01_map_trajectory.png)
 
@@ -26,6 +26,12 @@ RGB-D 与相机参数 → 时间关联与反投影 → 多帧几何对齐 → �
 - [实现说明：真实 RGB-D 帧对配准](docs/STAGE_02_RGBD.md)
 - [真实帧对实测与迭代上限诊断](reports/stage02_rgbd_pair.md)
 - [短序列累计与同区间采样对照](reports/stage02_sequence.md)
+- [第三关：ARKitScenes 适配与三维实例地图](docs/STAGE_03.md)
+- [第三关单场景数据检查](reports/stage03_data_check.md)
+- [第三关 A：新数据适配与独立区间重建](reports/stage03_arkit_preview.md)
+- [第三关 B：逐帧实例导出实测与分割失败案例](reports/stage03_instance_inputs.md)
+- [第三关 C：跨帧关联与体素重叠对照](docs/STAGE_03.md#c-跨帧关联与实例融合)
+- [第四关：多视角特征与文本检索](docs/STAGE_04.md)
 
 核心算法由学习者实现；可以调用图像读写、四元数转换、KD-tree、SVD 和点云显示等底层工具。助手协助解释、审查、调试、命令行入口整理和展示材料。
 
@@ -42,12 +48,17 @@ rgbd_instance_map/
 ├── fuse_known_poses.py   # 已知位姿融合入口
 ├── register_rgbd_pair.py # 帧对配准命令行入口
 ├── register_rgbd_sequence.py # 相邻帧配准与累计拼接
+├── arkit_io.py           # ARKitScenes 读取与帧关联
+├── preview_arkit.py      # 提供位姿下的场景预览
+├── extract_instances.py  # 掩码到世界坐标实例观测
+├── instance_map.py       # 同类实例的跨帧关联与点云融合
 ├── docs/
 │   ├── ROADMAP.md
 │   ├── STAGE_01.md
 │   ├── STAGE_02.md
 │   ├── STAGE_02_ICP.md
-│   └── STAGE_02_RGBD.md
+│   ├── STAGE_02_RGBD.md
+│   └── STAGE_03.md
 ├── data/                 # 本地数据，不提交 Git
 ├── outputs/              # 完整输出，不提交 Git
 ├── assets/               # 后续放精选截图和演示
@@ -121,6 +132,14 @@ python register_rgbd_sequence.py --sequence data/tum/rgbd_dataset_freiburg1_desk
 ![短序列采样对照与换起点的误差曲线](assets/stage02_sequence_errors.png)
 
 首段相同区间内，步长 1 的末帧误差为 4.55°、175.43 mm；换起点区间为 43.94°、983.39 mm，显示当前局部 ICP 前端的累积漂移。右列是不同时间区间的迁移检查，不作为采样参数对照。完整协议和核对方法见报告。
+
+## 第三关当前进度
+
+ARKitScenes 场景 `47333462` 的逐帧三维观测已导出。三帧椅子的有效深度像素为 12898、10470、11964，按 0.02 米体素下采样后分别为 1671、1789、1923 点。床样例迁移得到 1658、814、2261 点，几何与 JSON 核对通过。床的掩码覆盖部位差异明显，作为分割失败案例保留。[第三关 B 实测](reports/stage03_instance_inputs.md)
+
+`extract_instances.py` 当前通过脚本开头的 `mask_dir` 和 `output_dir` 选择输入输出，当前配置为床样例。椅子缓存位于 `outputs/stage03_chair_views_masks/`，已导出的观测位于 `outputs/stage03_observations/`。当前脚本逐目标打开点云窗口，关闭后继续处理，全部目标处理完后保存 `observations.json`。入口参数化属于后续工程整理任务。
+
+第三关 C 在 `instance_map.py` 实现了同类候选筛选、质心距离与体素 IoU 筛选、同帧一对一匹配和体素融合。真实三帧椅子合成一个地图 ID，合成双椅交换检测编号后保留两个地图 ID。错合并对照中，质心距离约 0.406 米、体素 IoU 约 0.037。只用距离得到一个实例，加 IoU 门槛后保留两个实例。命令行入口已复现这组对照，换回原始三帧椅子时得到一个实例、三条来源和 2621 个融合点。[第三关 C 实测与复现命令](docs/STAGE_03.md#6-体素重叠对照实测)
 
 ## 基础环境
 

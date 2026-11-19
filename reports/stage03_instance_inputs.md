@@ -1,0 +1,59 @@
+# 第三关 B：逐帧实例点云导出与独立迁移
+
+2026-11-16 准备分割缓存，2026-11-18 完成椅子主样例和床样例的几何导出检查。
+
+## 模型与运行
+
+复用学习者既有 `E:\shixi\grounded_sam_project\predict.py`，源码未修改。推理使用 `grounded_sam` 环境与本地缓存权重，几何处理继续使用既有几何环境。
+
+- 检测器：`IDEA-Research/grounding-dino-tiny`。
+- 分割器：`facebook/sam2.1-hiera-tiny`。
+- box_threshold=0.35，text_threshold=0.25。
+- 主输入提示词：`a chair.`。
+- 当前选择主体更完整的关联记录 372、380、388，保留原始文件名，将 RGB 副本放入 `outputs/stage03_chair_views_rgb/`。
+- 当前缓存输出目录：`outputs/stage03_chair_views_masks/`，入口文件为 `results.json`。
+
+分割缓存由既有前端生成。三维导出使用学习者编写的 `extract_instances.py`。
+
+## 主样例实测
+
+| 原始图片主名 | 单帧 object_id | 检测分数 | 掩码像素 | 有效深度像素 | 导出 PLY 点数 |
+|---|---:|---:|---:|---:|---:|
+| 47333462_57390.089 | 1 | 0.859227 | 12904 | 12898 | 1671 |
+| 47333462_57390.889 | 1 | 0.793842 | 10471 | 10470 | 1789 |
+| 47333462_57391.689 | 1 | 0.777997 | 12026 | 11964 | 1923 |
+
+有效深度条件为 mask 非零、深度大于 0 且小于 5000 毫米、置信度非零。三张图均有少量掩码像素被深度或置信度条件排除，因此掩码面积与有效三维点数量不必相同。
+
+三个 mask 均为 0/255 灰度图，尺寸与对应深度、置信度图相同，为 `(192,256)`。已核对 JSON 引用、非空掩码、像素数和文件对应关系，并观察原图与叠加图。当前组的主体、扶手和脚轮比边缘裁切预备组更完整；前两帧椅背上沿仍有裁切，第三帧补充上部视角但下部被裁切。多视角观测仍只描述可见表面。检测分数不是实测准确率。
+
+复现主缓存的既有命令为：
+
+```powershell
+conda activate grounded_sam
+python E:\shixi\grounded_sam_project\predict.py --source E:\shixi\rgbd_instance_map\outputs\stage03_chair_views_rgb --text "a chair." --output E:\shixi\rgbd_instance_map\outputs\stage03_chair_views_masks
+```
+
+导出结果位于 `outputs/stage03_observations/`，包含 `observations.json` 和三份经 0.02 米体素下采样的 PLY。已复核 PLY 的世界坐标与 RGB，并重新计算点数、质心和包围盒，与 JSON 记录一致。代码审查确认已加入掩码读取失败、尺寸检查和无有效点时的处理。
+
+当前 PLY 使用从 0 开始的帧内遍历索引命名，三帧椅子的后缀均为 `_0.ply`。JSON 的 `local_id` 保留检测缓存中的 `object_id=1`，读取点云时使用 `cloud_file` 字段。`extract_instances.py` 当前已切换到床输入与 `outputs/stage03_bed_observations/` 输出，椅子的既有输出仍作为 C 阶段输入。
+
+## 独立迁移与床的分割失败案例
+
+使用关联记录 200、210、220 的床视角，提示词为 `a bed.`。RGB 缓存在 `outputs/stage03_bed_rgb/`，掩码在 `outputs/stage03_bed_masks/`。学习者用同一套几何代码导出到 `outputs/stage03_bed_observations/`。
+
+| 图片主名 | 掩码主要覆盖 | 掩码像素 | 有效深度像素 | 导出 PLY 点数 |
+|---|---|---:|---:|---:|
+| 47333462_57372.880 | 床垫侧面和右侧床架 | 11299 | 11299 | 1658 |
+| 47333462_57373.879 | 床下区域，床面基本漏掉 | 4074 | 4066 | 814 |
+| 47333462_57374.879 | 被子、枕头和部分床面 | 10278 | 10278 | 2261 |
+
+三份 PLY 的坐标和颜色均与根据原始深度、内参、位姿重算的结果一致，几何导出迁移通过。第二帧的掩码中只有 8 个像素被深度和置信度筛选合计排除，床面缺失在二维掩码中已可见。三帧观测质心两两相距约 0.58–0.79 米，反映了这组观测对床的覆盖差异。保留该组用于分析分割误差如何影响跨帧关联。[下一步进入 C](../docs/STAGE_03.md#c-跨帧关联与实例融合)
+
+B 的几何导出及独立迁移已验收，分割覆盖差异作为失败记录保留。后续使用椅子观测完成了跨帧关联、体素融合与错合并对照。[第三关 C 实测](../docs/STAGE_03.md#6-体素重叠对照实测)
+
+## 边缘裁切预备组
+
+保留关联记录 300、301、302 的早期预备图像与输出，目录为 `outputs/stage03_instance_rgb/`、`outputs/stage03_instance_masks/`。目标位于左边缘且截断明显，当前练习改用上方的 372、380、388 三视角组。
+
+另保留了 `outputs/stage03_chair_rgb/` 与 `outputs/stage03_chair_masks/` 的单图预检查，其图像与边缘裁切预备组第一张相同，不是额外独立样本。
