@@ -135,11 +135,27 @@ python register_rgbd_sequence.py --sequence data/tum/rgbd_dataset_freiburg1_desk
 
 ## 第三关：跨帧实例地图运行
 
-ARKitScenes 场景 `47333462` 的逐帧三维观测已导出。三帧椅子的有效深度像素为 12898、10470、11964，按 0.02 米体素下采样后分别为 1671、1789、1923 点。床样例迁移得到 1658、814、2261 点，几何与 JSON 核对通过。床的掩码覆盖部位差异明显，作为分割失败案例保留。[第三关 B 实测](reports/stage03_instance_inputs.md)
+按[第三关数据准备与导出说明](docs/STAGE_03.md)准备 ARKitScenes 场景 `47333462` 的三帧椅子观测。输入为 `outputs/stage03_observations/observations.json` 和它引用的 PLY，点坐标已统一到世界坐标系。从项目根目录运行：
 
-`extract_instances.py` 当前通过脚本开头的 `mask_dir` 和 `output_dir` 选择输入输出，当前配置为床样例。椅子缓存位于 `outputs/stage03_chair_views_masks/`，已导出的观测位于 `outputs/stage03_observations/`。当前脚本逐目标打开点云窗口，关闭后继续处理，全部目标处理完后保存 `observations.json`。入口参数化属于后续工程整理任务。
+```powershell
+python instance_map.py --observations outputs/stage03_observations/observations.json --min_voxel_iou 0.10 --output outputs/stage03_cli_chair
+```
 
-第三关 C 在 `instance_map.py` 实现了同类候选筛选、质心距离与体素 IoU 筛选、同帧一对一匹配和体素融合。真实三帧椅子合成一个地图 ID，合成双椅交换检测编号后保留两个地图 ID。错合并对照中，质心距离约 0.406 米、体素 IoU 约 0.037。只用距离得到一个实例，加 IoU 门槛后保留两个实例。命令行入口已复现这组对照，换回原始三帧椅子时得到一个实例、三条来源和 2621 个融合点。[第三关 C 实测与复现命令](docs/STAGE_03.md#6-体素重叠对照实测)
+输出 `instance_1.ply` 和 `instances.json`。实测三帧融合为一个地图实例，共 2621 个带 RGB 的点。JSON 保留三条来源、包围盒和实际 IoU 门槛。脚本在同类候选中应用质心距离和可选的体素 IoU 门槛，限制每帧对同一地图实例的匹配次数为一次，融合使用 0.02 米体素。
+
+复现错合并对照时，先生成第一帧只有 A、第二帧只有 B 的合成输入，然后用同一份输入分别运行：
+
+```powershell
+python make_two_chairs_test.py
+
+python instance_map.py --observations outputs/stage03_observations_test/observations.json --output outputs/stage03_cli_distance
+
+python instance_map.py --observations outputs/stage03_observations_test/observations.json --min_voxel_iou 0.10 --output outputs/stage03_cli_iou
+```
+
+两把合成椅子的质心相距约 0.406 米，体素 IoU 约为 0.037。只用距离时，A 和 B 被归到同一地图实例。加上 IoU 门槛后，输出保留两个实例，各有一条来源。另一组合成双椅样例中，交换检测编号后也保留了两个地图 ID。输入构造和来源链见[第三关 C 实测](docs/STAGE_03.md#6-体素重叠对照实测)。
+
+三帧椅子的有效深度像素为 12898、10470、11964，逐帧按 0.02 米体素下采样后分别为 1671、1789、1923 点。床样例迁移得到 1658、814、2261 点，几何与 JSON 核对通过，掩码覆盖部位不一致作为分割失败案例保留。[第三关 B 实测](reports/stage03_instance_inputs.md)
 
 ## 基础环境
 
