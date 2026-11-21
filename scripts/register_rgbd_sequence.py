@@ -1,7 +1,7 @@
 import copy
-from registration import icp_point_to_point,evaluate_pose
-from geometry import interpolate_pose,transform_points
-from tum_io import read_image_index,read_pose_index,associate_records
+from rgbd_map.registration import icp_point_to_point,evaluate_pose
+from rgbd_map.geometry import interpolate_pose,transform_points
+from rgbd_map.tum_io import read_image_index,read_pose_index,associate_records
 import cv2 as cv
 import numpy as np
 from pathlib import Path

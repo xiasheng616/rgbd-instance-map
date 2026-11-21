@@ -22,8 +22,8 @@
 在既有 `yolov11` 环境中实际运行原脚本，不带 `--show`，使用独立的新建检查目录：
 
 ```powershell
-python fuse_known_poses.py --sequence data/tum/rgbd_dataset_freiburg1_desk --stride 20 --max-frames 2 --voxel-size 0.02 --output outputs/check_cli_2
-python fuse_known_poses.py --sequence data/tum/rgbd_dataset_freiburg1_desk --stride 20 --max-frames 1 --voxel-size 0.02 --output outputs/check_cli_1
+python -m scripts.fuse_known_poses --sequence data/tum/rgbd_dataset_freiburg1_desk --stride 20 --max-frames 2 --voxel-size 0.02 --output outputs/check_cli_2
+python -m scripts.fuse_known_poses --sequence data/tum/rgbd_dataset_freiburg1_desk --stride 20 --max-frames 1 --voxel-size 0.02 --output outputs/check_cli_1
 ```
 
 以上路径为复跑示例；本次检查实际使用自动创建的 `outputs/_review_cli_rmju6p95/frames2` 和 `frames1`，未覆盖学习者已有结果。

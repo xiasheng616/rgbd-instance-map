@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.spatial.transform import Rotation
-from registration import icp_point_to_point
-from geometry import transform_points
+from rgbd_map.registration import icp_point_to_point
+from rgbd_map.geometry import transform_points
 
 
 if __name__ == "__main__":

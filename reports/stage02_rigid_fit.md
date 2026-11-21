@@ -4,9 +4,9 @@
 
 ## 实现
 
-`registration.py` 中的 `estimate_rigid_transform(source, target)` 自行完成质心计算、去中心化、SVD、旋转恢复、反射修正、平移恢复和 4×4 变换矩阵组装。函数接收两组点并返回 source→target 变换。
+`rgbd_map/registration.py` 中的 `estimate_rigid_transform(source, target)` 自行完成质心计算、去中心化、SVD、旋转恢复、反射修正、平移恢复和 4×4 变换矩阵组装。函数接收两组点并返回 source→target 变换。
 
-`demo_rigid_fit.py` 负责生成数据、调用函数与打印误差，运行代码由主入口保护。
+`experiments/demo_rigid_fit.py` 负责生成数据、调用函数与打印误差，运行代码由主入口保护。
 
 ## 无噪声与代码核对
 

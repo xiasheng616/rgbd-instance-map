@@ -18,10 +18,10 @@
 
 新增两个文件：
 
-- `registration.py`：放可复用的 `estimate_rigid_transform(source, target)`，由你实现核心算法。
-- `demo_rigid_fit.py`：生成已知答案的点对、调用估计器、评估并可选显示。
+- `rgbd_map/registration.py`：放可复用的 `estimate_rigid_transform(source, target)`，由你实现核心算法。
+- `experiments/demo_rigid_fit.py`：生成已知答案的点对、调用估计器、评估并可选显示。
 
-先使用当前环境在 CPU 运行，不需要新的数据集或模型依赖。复用 `geometry.py` 中的 `transform_points()`。
+先使用当前环境在 CPU 运行，不需要新的数据集或模型依赖。复用 `rgbd_map/geometry.py` 中的 `transform_points()`。
 
 接口约定：
 
@@ -38,7 +38,7 @@ def estimate_rigid_transform(source, target):
 
 ## 生成具有已知答案的数据
 
-把下面的数据生成部分放进 `demo_rigid_fit.py`，核心估计函数仍由你写：
+把下面的数据生成部分放进 `experiments/demo_rigid_fit.py`，核心估计函数仍由你写：
 
 ```python
 import numpy as np

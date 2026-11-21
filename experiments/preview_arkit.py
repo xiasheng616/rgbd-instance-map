@@ -1,4 +1,4 @@
-from arkit_io import associate_frames,read_intrinsics,read_trajectory
+from rgbd_map.arkit_io import associate_frames,read_intrinsics,read_trajectory
 from pathlib import Path
 import cv2 as cv
 import numpy as np

@@ -30,7 +30,7 @@ ZIP 原件保留在同目录。数据与 ZIP 被现有 `.gitignore` 排除。标
 
 ## A 的完整小项目
 
-新建 `arkit_io.py` 与 `preview_arkit.py`，由学习者实现。复用已有反投影、点变换、点云叠加和保存方式，保留当前熟悉的脚本风格。
+新建 `rgbd_map/arkit_io.py` 与 `experiments/preview_arkit.py`，由学习者实现。复用已有反投影、点变换、点云叠加和保存方式，保留当前熟悉的脚本风格。
 
 ### 1. 在 arkit_io.py 实现两个读取函数
 
@@ -86,7 +86,7 @@ A 的实现与独立区间检查已通过。既有脚本不整体重构；如需
 
 ## B 的完整小项目：逐帧三维实例观测导出器
 
-新建 `extract_instances.py`，由学习者实现。复用 arkit_io 的纯函数和已有 NumPy 反投影逻辑，将缓存分割掩码对应的有效深度像素转换为世界坐标点云，输出逐帧物体记录。稳定地图 ID 在 C 中通过关联产生。
+新建 `scripts/extract_instances.py`，由学习者实现。复用 arkit_io 的纯函数和已有 NumPy 反投影逻辑，将缓存分割掩码对应的有效深度像素转换为世界坐标点云，输出逐帧物体记录。稳定地图 ID 在 C 中通过关联产生。
 
 ### 已准备的输入
 
@@ -157,13 +157,13 @@ bbox_max = saved_points.max(axis=0)
 - 独立迁移：换用 `outputs/stage03_bed_masks/results.json` 和同目录掩码，输出到另一个目录；相同几何代码应支持新类别和多张图。床的缓存已有覆盖部位不一致的失败现象，需要明确记录，不能因变成三维点云就认定语义正确。
 - 验收时解释像素如何经过 mask、深度、K、T_wc 变成一个三维观测，以及为何 local_id 不能直接作为 map_id。
 
-已有 `preview_arkit.py` 在导入时会执行预览主流程。新脚本先使用 `arkit_io.py` 和 `geometry.py` 的函数，反投影部分沿用现有写法；不直接导入预览入口来触发显示和保存。
+已有 `experiments/preview_arkit.py` 在导入时会执行预览主流程。新脚本先使用 `rgbd_map/arkit_io.py` 和 `rgbd_map/geometry.py` 的函数，反投影部分沿用现有写法；不直接导入预览入口来触发显示和保存。
 
 三帧椅子实际导出了 1671、1789、1923 个下采样后的点。床样例迁移也生成了三份 PLY，坐标、RGB 与观测统计均通过复核。掩码漏掉的床面在几何导出时无法恢复，详见 [B 实测记录](../reports/stage03_instance_inputs.md)。
 
 ## C 跨帧关联与实例融合
 
-**小项目：把三帧看见的同一把椅子合成一个地图实例，同时给不同的同类物体保留各自的 ID。** 在 `instance_map.py` 中实现按帧关联和点云融合。主样例复用 B 的世界坐标观测，三帧依次为 `57390.089`、`57390.889`、`57391.689`。
+**小项目：把三帧看见的同一把椅子合成一个地图实例，同时给不同的同类物体保留各自的 ID。** 在 `scripts/instance_map.py` 中实现按帧关联和点云融合。主样例复用 B 的世界坐标观测，三帧依次为 `57390.089`、`57390.889`、`57391.689`。
 
 ### 1. 读取观测并按帧分组
 
@@ -194,7 +194,7 @@ merged_cloud = (old_cloud + observation_cloud).voxel_down_sample(0.02)
 
 ### 4. 输出实例地图并检查主样例
 
-输出到 `outputs/stage03_instance_map/`。每个实例保存 `instance_<map_id>.ply`；`instances.json` 的顶层包含 `scene_id`、`coordinate_frame`（`world`）、`match_distance_m`（`0.5`）、`voxel_size_m`（`0.02`）和 `instances` 列表。列表里的每条记录包含 `map_id`、`label`、`cloud_file`、`point_count`、`centroid`、`bbox_min`、`bbox_max` 和来源 `observations`。从要写出的融合点云计算统计值，向量用 `.tolist()` 转成 JSON 数组。
+主样例的输出目录为 `outputs/stage03_cli_chair/`。每个实例保存 `instance_<map_id>.ply`；`instances.json` 的顶层包含 `scene_id`、`coordinate_frame`（`world`）、`match_distance_m`（`0.5`）、`voxel_size_m`（`0.02`）和 `instances` 列表。列表里的每条记录包含 `map_id`、`label`、`cloud_file`、`point_count`、`centroid`、`bbox_min`、`bbox_max` 和来源 `observations`。从要写出的融合点云计算统计值，向量用 `.tolist()` 转成 JSON 数组。
 
 主样例应得到一个 `instance_1.ply`，来源列表依时间记录三帧。运行后检查新建和匹配日志、显示带 RGB 的融合结果，再读取保存的 PLY 复算点数、质心和包围盒，与 JSON 比对。
 
@@ -211,6 +211,8 @@ merged_cloud = (old_cloud + observation_cloud).voxel_down_sample(0.02)
 
 主样例实测得到一个实例、三条来源和 2621 个融合点。双椅测例实测得到两个实例，每个实例有两条来源和 2197 个融合点。两条来源链分别为 `1 → 2` 和 `2 → 1`，地图 ID 稳定，PLY 点数、质心和包围盒与输出 JSON 一致。
 
+真实椅子的三帧掩码与融合后的 RGB 点云见[三帧实例融合图](../assets/stage03_instance_map.png)。
+
 ### 6. 体素重叠对照实测
 
 使用同一份输入，仅保留帧 `57390.089` 的原椅子 A 和帧 `57390.889` 的平移椅子 B。程序在第二帧只有 A 一个候选。两者的质心距离为 `0.405769 m`，在共享的 `0.05 m` 世界坐标体素网格上，占据体素的 IoU 为 `0.037084`。两次运行均使用 `0.5 m` 距离门槛和 `0.02 m` 的融合体素。
@@ -220,18 +222,20 @@ merged_cloud = (old_cloud + observation_cloud).voxel_down_sample(0.02)
 | 只用质心距离 | 1 | 2 | 2808 |
 | 质心距离加 IoU ≥ 0.10 | 2 | 1、1 | 1671、1789 |
 
-已核对两份 `instances.json` 引用的 PLY、点数、质心、包围盒和来源。当前输入位于 `outputs/stage03_observations_test/`，产物分别位于 `outputs/stage03_instance_map_test_only_distance/` 和 `outputs/stage03_instance_map_test_Iou_distance/`。该对照使用一把椅子的真实点云与平移副本，验证了这个受控案例中的错合并。床样例仍用于分析分割覆盖变化带来的质心漂移，真实多家具场景的关联另行验证。
+两组实际输出按相同的世界坐标投影和尺度绘制，颜色对应输出地图 ID。 [体素 IoU 对照图](../assets/stage03_association_comparison.png)
+
+已核对两份 `instances.json` 引用的 PLY、点数、质心、包围盒和来源。用 `python -m experiments.make_two_chairs_test` 可重建 `outputs/stage03_observations_test/`。保留的两组命令行结果位于 `outputs/stage03_cli_distance/` 和 `outputs/stage03_cli_iou/`。该对照使用一把椅子的真实点云与平移副本，验证了这个受控案例中的错合并。床样例仍用于分析分割覆盖变化带来的质心漂移，真实多家具场景的关联另行验证。
 
 ### 7. 复现实验的命令行入口
 
-`instance_map.py` 接收观测 JSON 路径、输出目录和可选 `--min_voxel_iou`。脚本按 JSON 所在目录解析 `cloud_file`，省略门槛时使用质心距离，指定 `0.10` 时再应用体素重叠门槛。输出 `instances.json` 记录实际设置，分别为 `null` 和 `0.1`。
+`scripts/instance_map.py` 接收观测 JSON 路径、输出目录和可选 `--min_voxel_iou`。脚本按 JSON 所在目录解析 `cloud_file`，省略门槛时使用质心距离，指定 `0.10` 时再应用体素重叠门槛。输出 `instances.json` 记录实际设置，分别为 `null` 和 `0.1`。
 
 ```powershell
-python instance_map.py --observations outputs/stage03_observations_test/observations.json --output outputs/stage03_cli_distance
+python -m scripts.instance_map --observations outputs/stage03_observations_test/observations.json --output outputs/stage03_cli_distance
 
-python instance_map.py --observations outputs/stage03_observations_test/observations.json --min_voxel_iou 0.10 --output outputs/stage03_cli_iou
+python -m scripts.instance_map --observations outputs/stage03_observations_test/observations.json --min_voxel_iou 0.10 --output outputs/stage03_cli_iou
 
-python instance_map.py --observations outputs/stage03_observations/observations.json --min_voxel_iou 0.10 --output outputs/stage03_cli_chair
+python -m scripts.instance_map --observations outputs/stage03_observations/observations.json --min_voxel_iou 0.10 --output outputs/stage03_cli_chair
 ```
 
 前两组命令复现了同一输入下的一个和两个实例。补齐参数记录后，在临时目录复跑检查了两个门槛值。第三组是独立输入迁移，实际保存了一个实例、三条来源、2621 个带 RGB 的融合点。回读 PLY 复算的质心和包围盒与 JSON 一致。

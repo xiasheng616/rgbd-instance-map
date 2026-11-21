@@ -14,7 +14,7 @@
 
 ## 检查方式
 
-执行学习者当前 `register_rgbd_pair.py`，仅将绘图函数替换为捕获显示数据的记录器，未弹出窗口、未修改核心代码或原始点云。
+执行学习者当前 `scripts/register_rgbd_pair.py`，仅将绘图函数替换为捕获显示数据的记录器，未弹出窗口、未修改核心代码或原始点云。
 
 捕获的三个标题为 Initial、Own ICP、Open3D ICP。初始 source 与原始 source 完全相同；所有显示中的 target 坐标相同。后两组显示的源坐标分别与对应矩阵作用后的 NumPy 结果相符，最大坐标差约 4.44e-16 米。此检查确认显示数据流，不代替实际截图观察。
 
@@ -81,7 +81,7 @@
 
 ## 命令行入口实测
 
-2026-11-15：在学习者原有 `register_rgbd_pair.py` 结构上接入命令行参数与保存代码，保留 `create_pcd(record)`、`reference`、二元组 `states`，以及先几何评价、再参考位姿评价的两个循环。主要计算顺序不变，新增内容用注释标识。`registration.py` 中的拟合、ICP 与评价实现保持本轮检查前版本。实际以命令行运行下列三种设置，source→target 方向均为后续帧到关联第 0 帧，结果与上面的记录一致：
+2026-11-15：在学习者原有 `scripts/register_rgbd_pair.py` 结构上接入命令行参数与保存代码，保留 `create_pcd(record)`、`reference`、二元组 `states`，以及先几何评价、再参考位姿评价的两个循环。主要计算顺序不变，新增内容用注释标识。`rgbd_map/registration.py` 中的拟合、ICP 与评价实现保持本轮检查前版本。实际以命令行运行下列三种设置，source→target 方向均为后续帧到关联第 0 帧，结果与上面的记录一致：
 
 | source | 迭代上限 | 自实现实际更新数 | 本地输出目录 |
 |---|---:|---:|---|

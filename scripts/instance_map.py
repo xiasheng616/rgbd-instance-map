@@ -18,8 +18,6 @@ def voxel_keys(cloud, voxel_size=0.05):
 
 
 
-
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--observations", type=Path, required=True)
 parser.add_argument("--output", type=Path, required=True)

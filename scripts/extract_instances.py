@@ -1,9 +1,9 @@
 from pathlib import Path
 import json
-from arkit_io import associate_frames,read_intrinsics,read_trajectory
+from rgbd_map.arkit_io import associate_frames,read_intrinsics,read_trajectory
 import cv2 as cv
 import numpy as np
-from geometry import transform_points
+from rgbd_map.geometry import transform_points
 import open3d as o3d
 
 

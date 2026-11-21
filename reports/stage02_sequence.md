@@ -4,7 +4,7 @@
 
 ## 实现与评价约定
 
-学习者实现入口 `register_rgbd_sequence.py`。每次将当前 source 相机点云向上一帧 target 配准，使用 `T_acc = T_acc @ T_step` 累计到所选首帧坐标系。变换使用点云副本，保留原始相机坐标点云用于相邻配准；首帧加入两张地图。
+学习者实现入口 `scripts/register_rgbd_sequence.py`。每次将当前 source 相机点云向上一帧 target 配准，使用 `T_acc = T_acc @ T_step` 累计到所选首帧坐标系。变换使用点云副本，保留原始相机坐标点云用于相邻配准；首帧加入两张地图。
 
 参考相对变换为 `inv(T_wc_0) @ T_wc_i`，参考位姿按 RGB 时间进行平移线性插值和旋转 SLERP。参考位姿只用于参考地图与误差评价，不提供给独立 ICP 初值或对应选择。
 
@@ -86,9 +86,9 @@ CSV 记录相对于首帧参考变换的旋转角误差与平移向量差范数�
 从项目根目录运行：
 
 ```powershell
-python register_rgbd_sequence.py --sequence data/tum/rgbd_dataset_freiburg1_desk --stride 5 --max-frames 20 --voxel-size 0.02 --max-distance 0.10 --max-iterations 200 --tolerance 1e-6 --output outputs/sequence_stride5
-python register_rgbd_sequence.py --sequence data/tum/rgbd_dataset_freiburg1_desk --stride 1 --max-frames 96 --voxel-size 0.02 --max-distance 0.10 --max-iterations 200 --tolerance 1e-6 --output outputs/sequence_stride1
-python register_rgbd_sequence.py --sequence data/tum/rgbd_dataset_freiburg1_desk --start-index 50 --stride 1 --max-frames 96 --voxel-size 0.02 --max-distance 0.10 --max-iterations 200 --tolerance 1e-6 --output outputs/sequence_start50_stride1
+python -m scripts.register_rgbd_sequence --sequence data/tum/rgbd_dataset_freiburg1_desk --stride 5 --max-frames 20 --voxel-size 0.02 --max-distance 0.10 --max-iterations 200 --tolerance 1e-6 --output outputs/sequence_stride5
+python -m scripts.register_rgbd_sequence --sequence data/tum/rgbd_dataset_freiburg1_desk --stride 1 --max-frames 96 --voxel-size 0.02 --max-distance 0.10 --max-iterations 200 --tolerance 1e-6 --output outputs/sequence_stride1
+python -m scripts.register_rgbd_sequence --sequence data/tum/rgbd_dataset_freiburg1_desk --start-index 50 --stride 1 --max-frames 96 --voxel-size 0.02 --max-distance 0.10 --max-iterations 200 --tolerance 1e-6 --output outputs/sequence_start50_stride1
 ```
 
 增加 `--show` 会在保存后依次显示估计地图和参考地图。CSV 距离列单位为米，本报告表格换算为毫米。

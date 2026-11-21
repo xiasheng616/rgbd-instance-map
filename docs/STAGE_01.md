@@ -29,7 +29,7 @@ data/tum/rgbd_dataset_freiburg1_desk/
 
 ## 今天先写的任务：三份索引的读取器
 
-在项目根目录新建 `tum_io.py`。今天先实现下面两个函数和用于检查的 `__main__`，暂时不写融合大循环。
+在 `rgbd_map/` 下新建 `tum_io.py`。今天先实现下面两个函数和用于检查的 `__main__`，暂时不写融合大循环。
 
 ```python
 def read_image_index(path):
@@ -61,7 +61,7 @@ RGB、深度和 GT 轨迹有不同时间戳。不能按文件排序后的相同�
 
 ### 2. 点云与坐标变换
 
-在 `geometry.py` 放反投影和变换函数。TUM PNG 深度：`depth_m = depth_raw / 5000.0`，0 无效。第一版有效范围可选 `0 < Z < 4.0` 米，并记录选择。
+在 `rgbd_map/geometry.py` 放反投影和变换函数。TUM PNG 深度：`depth_m = depth_raw / 5000.0`，0 无效。第一版有效范围可选 `0 < Z < 4.0` 米，并记录选择。
 
 沿用官方建议的 ROS 默认、不额外去畸变配置：`fx=fy=525.0, cx=319.5, cy=239.5`。这是本序列入门基线的明确选择，不是所有相机通用参数；TUM 原始深度已经做过比例校正，不再乘额外校正系数。
 
@@ -77,12 +77,12 @@ TUM 的 `groundtruth.txt` 给出相机相对于世界的平移和四元数，按
 
 ### 3. 多帧融合入口
 
-写 `fuse_known_poses.py`，调用前两个文件。先两帧确认，再扩到 20—50 个采样帧。用 Open3D 的 `voxel_down_sample` 控制点数，体素边长先取 0.02 米；区分直接拼接与体素下采样后的点数。
+写 `scripts/fuse_known_poses.py`，调用前两个文件。先两帧确认，再扩到 20—50 个采样帧。用 Open3D 的 `voxel_down_sample` 控制点数，体素边长先取 0.02 米；区分直接拼接与体素下采样后的点数。
 
 目标 CLI 接口，待你实现后使用：
 
 ```powershell
-python fuse_known_poses.py --sequence data/tum/rgbd_dataset_freiburg1_desk --stride 10 --max-frames 30 --voxel-size 0.02 --output outputs/stage01
+python -m scripts.fuse_known_poses --sequence data/tum/rgbd_dataset_freiburg1_desk --stride 10 --max-frames 30 --voxel-size 0.02 --output outputs/stage01
 ```
 
 参数从关联后的有效帧列表采样。保存 PLY 和代表性截图；轨迹只需先画出相机中心连线及少量坐标轴，无须做复杂界面。

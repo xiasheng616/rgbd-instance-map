@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.spatial.transform import Rotation
-from geometry import transform_points
-from registration import estimate_rigid_transform
+from rgbd_map.geometry import transform_points
+from rgbd_map.registration import estimate_rigid_transform
 
 
 

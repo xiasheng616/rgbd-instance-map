@@ -1,5 +1,5 @@
-from geometry import pose_to_matrix,transform_points
-from tum_io import read_image_index,read_pose_index,associate_records
+from rgbd_map.geometry import pose_to_matrix,transform_points
+from rgbd_map.tum_io import read_image_index,read_pose_index,associate_records
 import numpy as np
 from pathlib import Path
 import cv2 as cv

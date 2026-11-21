@@ -8,7 +8,7 @@
 
 ## 现在先写的完整任务
 
-新建 `register_rgbd_pair.py`，复用 TUM 读取、时间关联、反投影与现有 ICP。
+新建 `scripts/register_rgbd_pair.py`，复用 TUM 读取、时间关联、反投影与现有 ICP。
 
 ### 1. 选择帧与坐标约定
 
@@ -79,7 +79,7 @@ reference = o3d.pipelines.registration.registration_icp(
 
 ### 当前任务：参考位姿评价器
 
-在 `geometry.py` 中由学习者新增：
+在 `rgbd_map/geometry.py` 中由学习者新增：
 
 ```python
 def interpolate_pose(timestamp, pose_timestamps, poses):
@@ -118,7 +118,7 @@ T_target_source_ref = inv(T_wc_target) @ T_wc_source
 
 两次调用 interpolate_pose 得到 T_wc_source、T_wc_target 后，按上述公式计算 T_ref。这里得到的是与 ICP 相同方向的参考相对变换，而不是两帧位置直接相减。
 
-在 `registration.py` 中由学习者新增：
+在 `rgbd_map/registration.py` 中由学习者新增：
 
 ```python
 def evaluate_pose(T_est, T_ref):

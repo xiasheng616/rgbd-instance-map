@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.spatial import cKDTree
-from geometry import transform_points
+from rgbd_map.geometry import transform_points
 from scipy.spatial.transform import Rotation
 
 

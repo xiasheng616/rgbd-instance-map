@@ -13,7 +13,7 @@
 - 当前选择主体更完整的关联记录 372、380、388，保留原始文件名，将 RGB 副本放入 `outputs/stage03_chair_views_rgb/`。
 - 当前缓存输出目录：`outputs/stage03_chair_views_masks/`，入口文件为 `results.json`。
 
-分割缓存由既有前端生成。三维导出使用学习者编写的 `extract_instances.py`。
+分割缓存由既有前端生成。三维导出使用学习者编写的 `scripts/extract_instances.py`。
 
 ## 主样例实测
 
@@ -36,7 +36,7 @@ python E:\shixi\grounded_sam_project\predict.py --source E:\shixi\rgbd_instance_
 
 导出结果位于 `outputs/stage03_observations/`，包含 `observations.json` 和三份经 0.02 米体素下采样的 PLY。已复核 PLY 的世界坐标与 RGB，并重新计算点数、质心和包围盒，与 JSON 记录一致。代码审查确认已加入掩码读取失败、尺寸检查和无有效点时的处理。
 
-当前 PLY 使用从 0 开始的帧内遍历索引命名，三帧椅子的后缀均为 `_0.ply`。JSON 的 `local_id` 保留检测缓存中的 `object_id=1`，读取点云时使用 `cloud_file` 字段。`extract_instances.py` 当前已切换到床输入与 `outputs/stage03_bed_observations/` 输出，椅子的既有输出仍作为 C 阶段输入。
+当前 PLY 使用从 0 开始的帧内遍历索引命名，三帧椅子的后缀均为 `_0.ply`。JSON 的 `local_id` 保留检测缓存中的 `object_id=1`，读取点云时使用 `cloud_file` 字段。`scripts/extract_instances.py` 当前已切换到床输入与 `outputs/stage03_bed_observations/` 输出，椅子的既有输出仍作为 C 阶段输入。
 
 ## 独立迁移与床的分割失败案例
 
@@ -54,6 +54,4 @@ B 的几何导出及独立迁移已验收，分割覆盖差异作为失败记录
 
 ## 边缘裁切预备组
 
-保留关联记录 300、301、302 的早期预备图像与输出，目录为 `outputs/stage03_instance_rgb/`、`outputs/stage03_instance_masks/`。目标位于左边缘且截断明显，当前练习改用上方的 372、380、388 三视角组。
-
-另保留了 `outputs/stage03_chair_rgb/` 与 `outputs/stage03_chair_masks/` 的单图预检查，其图像与边缘裁切预备组第一张相同，不是额外独立样本。
+关联记录 300、301、302 曾用于早期预检。椅子位于图像左边缘且截断明显，正式验收改用上方的 372、380、388 三视角组。单图预检与这一预备组的首帧相同。原始帧仍在场景数据中，早期选帧副本和分割缓存已清理。
