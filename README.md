@@ -4,7 +4,7 @@
 
 当前已跑通从 RGB-D 到同一场景内两个真实物体的文本检索：用三帧椅子和一帧床构建两个地图实例，查询句从椅子换成床时，Top-1 也切换到正确的实例。[查看实测与演示](#第四关双实例文本检索运行)。第一至第三关保留了已知位姿融合、ICP 漂移分析和跨帧关联对照。
 
-第五关把评估迁移到另一个访次的场景，固定 8 个候选和 8 条查询对照首视角与多视角，并记录重复地图 ID 和误分类。[查看留出场景对照](#第五关留出场景检索对照运行)。
+第五关对照了一个开发场景和两个留出场景，并在相似餐椅场景中记录了裁剪干扰和分割失败。固定本次查询与地图候选时，首视角和多视角未观察到排名差异。[查看相似餐椅难例](#第五关相似餐椅难例运行)。
 
 ![第一关：已知位姿融合地图与所选帧的相机中心轨迹](assets/stage01_map_trajectory.png)
 
@@ -36,7 +36,7 @@ RGB-D 与相机参数 → 时间关联与反投影 → 多帧几何对齐 → �
 - [第四关：多视角特征与文本检索](docs/STAGE_04.md)
 - [第四关双实例检索验收记录](reports/stage04_text_retrieval.md)
 - [第五关：批量检索评估与多视角对照](docs/STAGE_05.md)
-- [第五关：两场景实测与地图失败案例](reports/stage05_retrieval_comparison.md)
+- [第五关：三场景实测与地图失败案例](reports/stage05_retrieval_comparison.md)
 
 核心算法由学习者实现；可以调用图像读写、四元数转换、KD-tree、SVD 和点云显示等底层工具。助手协助解释、审查、调试、命令行入口整理和展示材料。
 
@@ -279,6 +279,19 @@ python -m scripts.evaluate_retrieval --features outputs/stage05_c_47333452_multi
 ![留出场景中首视角与全视角的预测地图 ID 对照](assets/stage05_retrieval_comparison.png)
 
 两组均为 Top-1 **8/8**、MRR **1.0**。唯一的第一名 ID 变化为冰箱 `5 → 6`；两者在评分前就已标为同一台冰箱的正确 ID，物体级名次不变。原始 8 个地图 ID 未删减，包含重复和误标。这里验证已入库候选的检索，不是检测召回、地图质量或跨场景泛化指标。[逐条结果与限制](reports/stage05_retrieval_comparison.md)
+
+## 第五关：相似餐椅难例运行
+
+在 `42446540` 先核对掩码和物体对应，再固定两把花纹餐椅的 4 条查询，保留全部 8 个原始地图候选。按[固定选帧、分割及检索命令](docs/STAGE_05.md#42446540-地图审查同类难例成立遮挡导致上游失败)准备相同候选的两份特征库，随后运行：
+
+```powershell
+python -m scripts.evaluate_retrieval --features outputs/stage05_c_42446540_first_instances/instance_features.json --queries experiments/fixtures/stage05_queries_42446540.json --output outputs/stage05_c_42446540_eval_first
+python -m scripts.evaluate_retrieval --features outputs/stage05_c_42446540_multi_instances/instance_features.json --queries experiments/fixtures/stage05_queries_42446540.json --output outputs/stage05_c_42446540_eval_multi
+```
+
+![相似餐椅场景的实际掩码和裁剪干扰](assets/stage05_hard_scene_audit.png)
+
+两组均为 Top-1 **4/4**、MRR **1.0**。餐桌框包含一把椅子的画面，但掩码主体是餐桌；另一帧将挂夹克的椅子和餐桌分进同一掩码，未建成独立椅子 ID。后者作为上游失败记录，没有用在检索指标里；对照不能证明多视角解决了遮挡。[完整结果](reports/stage05_retrieval_comparison.md#第二个留出场景42446540)
 
 ## 基础环境
 

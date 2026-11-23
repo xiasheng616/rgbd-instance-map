@@ -1,0 +1,9 @@
+{
+  "scene_id": "42446540",
+  "queries": [
+    {"query_id": "diamond_01", "text": "a dining chair seen from behind with a dark diamond-patterned back", "target_map_ids": [2]},
+    {"query_id": "diamond_02", "text": "a tall gray chair back with black diamond motifs", "target_map_ids": [2]},
+    {"query_id": "leaf_01", "text": "a side view of a dining chair with a black leaf-patterned seat", "target_map_ids": [7]},
+    {"query_id": "leaf_02", "text": "a chair with a leaf-patterned cushion and curved metal legs", "target_map_ids": [7]}
+  ]
+}

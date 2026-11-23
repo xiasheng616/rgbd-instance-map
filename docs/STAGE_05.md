@@ -312,4 +312,278 @@ python -m scripts.evaluate_retrieval --features outputs/stage05_c_47333452_multi
 
 ### C 阶段实测
 
-学习者已完成两组评估。逐项核对到 15 条视角特征、相同的 8 个原始地图 ID、相同的 8 条查询与多答案标注；两个实例矩阵均为 `(8, 768)`，按源索引复算与落盘结果一致。两组 Top-1 都是 8/8，MRR 都是 1.0，没有查询改变第一个正确结果的名次。查询 `fridge_02` 的第一名 ID 从 5 换到 6，但两者都是事先核定的同一台冰箱。[逐条结果与双场景报告](../reports/stage05_retrieval_comparison.md)
+学习者已完成两组评估。逐项核对到 15 条视角特征、相同的 8 个原始地图 ID、相同的 8 条查询与多答案标注；两个实例矩阵均为 `(8, 768)`，按源索引复算与落盘结果一致。两组 Top-1 都是 8/8，MRR 都是 1.0，没有查询改变第一个正确结果的名次。查询 `fridge_02` 的第一名 ID 从 5 换到 6，但两者都是事先核定的同一台冰箱。[逐条结果与报告](../reports/stage05_retrieval_comparison.md)
+
+### 第二个留出场景：相似物体或部分遮挡
+
+固定候选为 ARKitScenes Validation 序列 `47333440`，访次 `467176`，不同于开发场景的 `467138` 与已评估留出场景的 `467172`。[官方划分](https://github.com/apple-aiml-research/ARKitScenes/blob/main/raw/raw_train_val_splits.csv#L3441-L3450)。学习者先前读到的标注包含三把椅子、五个柜子以及洗衣机、马桶和水槽；当前仅确认标注类别，不确认相似椅子的可见性、遮挡或可用配对帧。
+
+先采集下列画面证据，再冻结该场景的选帧，不根据检索得分挑样本：
+
+1. 找到两把可独立辨认、视觉相近的椅子，最好至少一帧同时出现；每把最好有两帧有效观测。目标是确认两个实体，不把同一把椅子的两个地图 ID 当成同类干扰。
+2. 如果同一把椅子有较早的部分遮挡或画面截断，以及较晚的更清楚视角，记录两帧及其差别。首视角仍定义为时间最早的有效观测，不能在评分后挑最低分的视角。遮挡（被物体挡住）和截断（物体超出画面）分别记录。
+3. 查询用裁剪图中可核对的特征来区分椅子，例如座面颜色、椅背有无孔洞或椅脚形状。若现有裁剪里两把椅子确实无法区分，不硬给含糊描述指定一个 ID。未检出、串 ID、重复 ID 等另记为上游问题；不把漏检目标当作闭集检索样本。
+
+两组都沿用同一份原始地图、所有有效候选、相同文本与答案、相同模型和阈值。对比 Top-1、MRR、逐条排名变化，并额外数清楚「查 A 却把 B 排第一」的同类混淆。没有满足相似或遮挡条件时，可报告该场景不符合本次难例协议，不把它描述成已验证的遮挡测试。
+
+#### 下载与预览
+
+以下在项目根目录的 PowerShell 运行。前半段只下载指定序列的低分辨率 RGB、深度、置信度、内参、轨迹和标注；后半段在场景根目录解压。下载地址与文件命名来自[官方下载脚本](https://github.com/apple-aiml-research/ARKitScenes/blob/main/download_data.py)。不会改动之前的场景。
+
+```powershell
+Set-Location E:\shixi\rgbd_instance_map
+$hardSceneId = '47333440'
+$hardSceneDir = "data/arkitscenes/raw/Validation/$hardSceneId"
+$hardSceneUrl = "https://docs-assets.developer.apple.com/ml-research/datasets/arkitscenes/v1/raw/Validation/$hardSceneId"
+$hardModalities = @('lowres_wide', 'lowres_depth', 'confidence', 'lowres_wide_intrinsics')
+$hardAssets = @($hardModalities | ForEach-Object { "$_.zip" }) + @('lowres_wide.traj', "${hardSceneId}_3dod_annotation.json")
+New-Item -ItemType Directory -Path $hardSceneDir -Force | Out-Null
+foreach ($asset in $hardAssets) {
+    $dest = Join-Path $hardSceneDir $asset
+    if (Test-Path -LiteralPath $dest -PathType Leaf) { continue }
+    curl.exe -fL --retry 2 --connect-timeout 15 --max-time 1800 -o "$dest.part" "$hardSceneUrl/$asset"
+    if ($LASTEXITCODE -ne 0) { throw "下载失败：$asset" }
+    Move-Item -LiteralPath "$dest.part" -Destination $dest
+}
+foreach ($modality in $hardModalities) {
+    if (Test-Path -LiteralPath (Join-Path $hardSceneDir $modality) -PathType Container) { continue }
+    Expand-Archive -LiteralPath (Join-Path $hardSceneDir "$modality.zip") -DestinationPath $hardSceneDir -ErrorAction Stop
+}
+```
+
+下载后用下面的命令复用帧关联，等间隔抽最多 36 张已经配对的 RGB。它只生成预览图，不创建源码、不跑分割、不计算检索分数。图上编号是关联列表索引。
+
+```powershell
+conda activate yolov11
+@'
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageOps
+from rgbd_map.arkit_io import associate_frames, read_trajectory
+
+scene = Path("data/arkitscenes/raw/Validation/47333440")
+times, _ = read_trajectory(scene / "lowres_wide.traj")
+records = associate_frames(scene, times)
+if not records:
+    raise SystemExit("No associated RGB-D frames. Check the extracted files.")
+
+count = min(36, len(records))
+indices = [round(i * (len(records) - 1) / max(count - 1, 1)) for i in range(count)]
+sheet = Image.new("RGB", (6 * 220, ((count + 5) // 6) * 187), "#202631")
+draw = ImageDraw.Draw(sheet)
+for slot, index in enumerate(indices):
+    x, y = slot % 6 * 220, slot // 6 * 187
+    path = records[index]["rgb_path"]
+    with Image.open(path) as rgb:
+        sheet.paste(ImageOps.contain(rgb.convert("RGB"), (212, 159)), (x + 4, y + 4))
+    draw.text((x + 4, y + 168), f"{index}: {path.stem.rsplit('_', 1)[1]}", fill="white")
+output = Path("outputs/stage05_c_47333440_preview/contact_sheet.jpg")
+output.parent.mkdir(parents=True, exist_ok=True)
+sheet.save(output, quality=92)
+print(f"associated_frames={len(records)}, preview={output}")
+'@ | python -
+```
+
+预览验收：关联帧数大于零，预览图可打开且带索引。之后结合预览和邻近帧，定约 6–10 张用于难例对照；不提前假设候选数量或检索实验结果。
+
+#### 47333440 预览裁决：不纳入独立难例评估
+
+该序列成功关联 524 帧。对照原图 `47333452_54994.722.png` 和 `47333440_53842.927.png`：前者从厨房方向拍到红白瓷砖浴室和门上虎纹毯，后者从同一门口反向看见此前的绿色玩具、浅木抽屉柜、粉色收纳盒和地毯。这是两个访次很可能属于同一套住处的画面证据。不同访次编号并不足以核实物理环境独立。
+
+该浴室只确认一把成人灰椅的连续视角，画面中的小脚凳和黄色儿童玩具不构成相似成人椅对；灰椅能找到远景和画面边缘截断，但不能把门旁的毯子说成挡住了椅子。保留原始下载和预览用于记录排除理由；本序列不计入独立难例结果，不运行主检索或为其调整阈值。
+
+#### 替补：标注初筛后，先只下载 RGB 预览
+
+首选 `42446540`（访次 `422381`），备用 `42897564`（访次 `422785`），都列在 [ARKitScenes 官方 Validation 划分](https://github.com/apple-aiml-research/ARKitScenes/blob/main/raw/raw_train_val_splits.csv)。[ReVSI 的公开计数标注](https://huggingface.co/datasets/3dlg-hcvc/ReVSI)分别记录 4 把和 7 把椅子，比没有椅子类别线索的随机候选更适合预览。这不是对 Apple 标注数量、同帧可见性或实际遮挡的核验。可选地先读 Apple 标注，**不写文件**：
+
+```powershell
+$altValidation = 'https://docs-assets.developer.apple.com/ml-research/datasets/arkitscenes/v1/raw/Validation'
+foreach ($sceneId in '42446540','42897564') {
+    $body = curl.exe -fsSL --connect-timeout 8 --max-time 20 --max-filesize 1048576 "$altValidation/$sceneId/${sceneId}_3dod_annotation.json"
+    if ($LASTEXITCODE -ne 0) { Write-Warning "Could not read scene $sceneId"; continue }
+    $annotation = ($body -join "`n") | ConvertFrom-Json
+    $labels = $annotation.data | Group-Object label | ForEach-Object { "$($_.Name): $($_.Count)" }
+    "$sceneId => $($labels -join ', ')"
+}
+```
+
+按固定顺序先只看 `42446540`，不在此时下载备用场景。下面只生成一个场景的 `lowres_wide.zip`、解压后的 RGB 和一张预览图。生成的预览是 `outputs/stage05_c_42446540_rgb_preview/contact_sheet.jpg`。不新建 Python 源文件。
+
+```powershell
+Set-Location E:\shixi\rgbd_instance_map
+$altSceneId = '42446540'
+$altRoot = "data/arkitscenes/raw/Validation/$altSceneId"
+$altRgbArchive = Join-Path $altRoot 'lowres_wide.zip'
+New-Item -ItemType Directory -Path $altRoot -Force | Out-Null
+if (-not (Test-Path -LiteralPath $altRgbArchive -PathType Leaf)) {
+    $altRgbUrl = "https://docs-assets.developer.apple.com/ml-research/datasets/arkitscenes/v1/raw/Validation/$altSceneId/lowres_wide.zip"
+    curl.exe -fL --retry 2 --connect-timeout 15 --max-time 1800 -o "$altRgbArchive.part" $altRgbUrl
+    if ($LASTEXITCODE -ne 0) { throw 'RGB 下载失败' }
+    Move-Item -LiteralPath "$altRgbArchive.part" -Destination $altRgbArchive
+}
+if (-not (Test-Path -LiteralPath (Join-Path $altRoot 'lowres_wide') -PathType Container)) {
+    Expand-Archive -LiteralPath $altRgbArchive -DestinationPath $altRoot -ErrorAction Stop
+}
+
+conda activate yolov11
+@'
+import sys
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageOps
+
+scene_id = sys.argv[1]
+rgb_dir = Path("data/arkitscenes/raw/Validation") / scene_id / "lowres_wide"
+frames = sorted(rgb_dir.glob("*.png"))
+if not frames:
+    raise SystemExit("No RGB files. Check the extracted directory.")
+count = min(36, len(frames))
+indices = [round(i * (len(frames) - 1) / max(count - 1, 1)) for i in range(count)]
+sheet = Image.new("RGB", (6 * 220, ((count + 5) // 6) * 187), "#202631")
+draw = ImageDraw.Draw(sheet)
+for slot, index in enumerate(indices):
+    x, y = slot % 6 * 220, slot // 6 * 187
+    with Image.open(frames[index]) as rgb:
+        sheet.paste(ImageOps.contain(rgb.convert("RGB"), (212, 159)), (x + 4, y + 4))
+    draw.text((x + 4, y + 168), frames[index].stem, fill="white")
+out = Path("outputs") / f"stage05_c_{scene_id}_rgb_preview" / "contact_sheet.jpg"
+out.parent.mkdir(parents=True, exist_ok=True)
+sheet.save(out, quality=92)
+print(f"rgb_frames={len(frames)}, preview={out}")
+'@ | python - $altSceneId
+```
+
+这是只看 RGB 的预览，标题标的是文件名，未做深度、置信度或位姿配对，不能把打印的 `rgb_frames` 作为可用关联帧数。确认有不同环境、可验证的相似物体或前景遮挡后，再补齐同版本的剩余资产并配对。
+
+#### 42446540 预览通过：补齐 RGB-D 并冻结选帧
+
+已核对本地 5367 张原始 RGB 和预览：灰色沙发、阳台和白色马赛克厨房与 `47333452` 的布置明显不同。餐桌两侧能看见多把花纹近似的餐椅；`201499.999` 是条纹夹克、深色外套覆盖椅背的清楚证据，`201506.996` 可见另一把花纹椅，部分被桌面/桌布挡住。衣物在扫视中没有被移走的证据，不称为后来脱离遮挡。
+
+从已有 RGB 预先确定参考时刻：`201472.994`、`201473.294`、`201475.393`、`201499.999`、`201500.499`、`201501.998`、`201506.996`、`201508.996`。前三个保持共现和第一侧视角，中间三个保留挂衣椅子和相邻花纹椅，后两个提供桌边另一角度。此时只验证了 RGB 可见性，未验证配套数据与正确的地图关联。
+
+在项目根目录运行。下面只补深度、置信度、内参、轨迹和标注，**跳过已经下载和解压的 RGB**。ZIP 解压到场景目录。文件命名依据 [ARKitScenes 官方下载脚本](https://github.com/apple-aiml-research/ARKitScenes/blob/main/download_data.py)。
+
+```powershell
+Set-Location E:\shixi\rgbd_instance_map
+$sceneDir = 'data/arkitscenes/raw/Validation/42446540'
+$sceneUrl = 'https://docs-assets.developer.apple.com/ml-research/datasets/arkitscenes/v1/raw/Validation/42446540'
+$remainingModes = @('lowres_depth','confidence','lowres_wide_intrinsics')
+$remainingAssets = @($remainingModes | ForEach-Object { "$_.zip" }) + @('lowres_wide.traj','42446540_3dod_annotation.json')
+foreach ($asset in $remainingAssets) {
+    $dest = Join-Path $sceneDir $asset
+    if (Test-Path -LiteralPath $dest -PathType Leaf) { continue }
+    curl.exe -fL --retry 2 --connect-timeout 15 --max-time 1800 -o "$dest.part" "$sceneUrl/$asset"
+    if ($LASTEXITCODE -ne 0) { throw "下载失败：$asset" }
+    Move-Item -LiteralPath "$dest.part" -Destination $dest
+}
+foreach ($mode in $remainingModes) {
+    if (Test-Path -LiteralPath (Join-Path $sceneDir $mode) -PathType Container) { continue }
+    Expand-Archive -LiteralPath (Join-Path $sceneDir "$mode.zip") -DestinationPath $sceneDir -ErrorAction Stop
+}
+```
+
+用现有 `associate_frames` 产生真正配对的记录。对每个预选时刻，在前后 `0.15 s` 内取最近的一帧，不重复用同一文件，不用整张置信度为零的帧。这个上限只用于**挑选附近的已对齐 RGB 帧**，不是放宽对齐时的位姿误差门槛。命令打印参考时刻与实际选中帧，至少 6 张才复制到 `outputs/stage05_c_42446540_rgb`；无需新建 Python 源文件。
+
+```powershell
+conda activate yolov11
+@'
+from pathlib import Path
+from shutil import copy2
+import cv2 as cv
+from rgbd_map.arkit_io import associate_frames, read_trajectory
+
+scene = Path("data/arkitscenes/raw/Validation/42446540")
+times, _ = read_trajectory(scene / "lowres_wide.traj")
+records = associate_frames(scene, times)
+print(f"associated_frames={len(records)}")
+targets = (201472.994, 201473.294, 201475.393, 201499.999, 201500.499, 201501.998, 201506.996, 201508.996)
+selected = []
+for target in targets:
+    nearby = sorted(
+        (r for r in records if abs(r["timestamp"] - target) <= 0.15),
+        key=lambda r: (abs(r["timestamp"] - target), r["timestamp"]),
+    )
+    for record in nearby:
+        rgb = record["rgb_path"]
+        if rgb in selected:
+            continue
+        confidence = cv.imread(str(record["confidence_path"]), cv.IMREAD_UNCHANGED)
+        if confidence is None or not confidence.any():
+            continue
+        selected.append(rgb)
+        print(f"{target:.3f} -> {rgb.name}, offset={record['timestamp']-target:+.3f}s")
+        break
+    else:
+        print(f"{target:.3f} -> skipped: no eligible paired frame in window")
+if len(selected) < 6:
+    raise SystemExit("Fewer than six selected frames. Review the pairing before proceeding.")
+
+output = Path("outputs/stage05_c_42446540_rgb")
+output.mkdir(parents=True, exist_ok=True)
+extras = {p.name for p in output.glob("*.png")} - {p.name for p in selected}
+if extras:
+    raise SystemExit(f"Existing RGB directory contains unexpected files: {sorted(extras)}")
+for rgb in selected:
+    copy2(rgb, output / rgb.name)
+print(f"selected={len(selected)}, output={output}")
+'@ | python -
+```
+
+先看实际复制的 RGB 确认保留了两把可区分的相似椅子和衣物遮挡证据。若配对不足或近邻帧关键线索消失，保留已知结果，在任何模型评分前核对选帧。通过后用固定提示词 `a chair. a dining table.` 和已有阈值运行：
+
+```powershell
+conda activate grounded_sam
+python ../grounded_sam_project/predict.py --source outputs/stage05_c_42446540_rgb --text "a chair. a dining table." --box_threshold 0.35 --text_threshold 0.25 --output outputs/stage05_c_42446540_masks
+
+conda activate yolov11
+python -m scripts.extract_instances --scene data/arkitscenes/raw/Validation/42446540 --masks outputs/stage05_c_42446540_masks --output outputs/stage05_c_42446540_observations
+python -m scripts.instance_map --observations outputs/stage05_c_42446540_observations/observations.json --min_voxel_iou 0.10 --output outputs/stage05_c_42446540_map
+python -m scripts.export_instance_views --instances outputs/stage05_c_42446540_map/instances.json --detections outputs/stage05_c_42446540_masks/results.json --crop-mode box --output outputs/stage05_c_42446540_views
+```
+
+这四条命令分别生成掩码、世界坐标点云、地图 ID 和用于人工核验的视角裁剪。到这里先核对地图：若两把椅子被合为一个 ID，记录关联失败；若同一把椅子有重复 ID，按确认的实体指定多答案。不要先看检索分数再写查询目标。较笼统的“花纹餐椅”可能同时符合多个实体，不用于单答案难例。
+
+#### 42446540 地图审查：同类难例成立，遮挡导致上游失败
+
+实际关联 878 帧。从预定的 8 个参考时刻选到了 8 张同时具备有效配套数据的 RGB，分别为 `201473.044`、`201473.244`、`201475.443`、`201500.049`、`201500.549`、`201501.948`、`201507.046`、`201509.046`。每个时刻与原计划的偏差约 0.05 秒。8 张图共产生 11 条检测、11 条三维观测、11 张裁剪，关联后有 8 个原始地图 ID。下表在检索之前按掩码、裁剪和来源核对：
+
+| 地图 ID | 观测数 | 图像及掩码证据 |
+| --- | ---: | --- |
+| 1 | 3 | 餐桌，框裁剪里显眼地包含了 ID 2 的椅子，但掩码主要落在两侧的桌面/桌布上。保留为干扰候选，不是椅子正例。 |
+| 2 | 2 | 两个来源都看到同一把深色菱形花纹椅背的椅子，作为目标。 |
+| 3 | 1 | 同一掩码里覆盖餐桌和披有黑白条纹夹克的椅子；没有找到该椅独立的候选。 |
+| 4、6、8 | 各 1 | 同一餐桌的其他局部，原样保留。 |
+| 5 | 1 | 掩码主要覆盖深色外套，衣物下的椅子缺少可验证的细节，不作本次检索正例。 |
+| 7 | 1 | 相邻侧面的另一把餐椅，座面为深色叶纹，掩码边缘稍包含桌布，仍可凭画面辨认。 |
+
+本次公开结果应区分两种情况：ID 2 与 ID 7 能用局部花纹属性区分，可用于**同类物体检索**；条纹夹克椅没有独立的 ID，是上游漏分/混合掩码，不能作为闭集检索失败来计算 Top-1 和 MRR。这里只能观察对相似椅子的排名变化，不能评价多视角是否恢复了被外套遮住的目标。只有 ID 1（3 个视角）和 ID 2（2 个视角）的聚合特征会改变；ID 7 在两组都只用同一帧。
+
+由学习者新建 `experiments/fixtures/stage05_queries_42446540.json`。不改模型、候选集合、裁剪或评估函数。两个可辨认物体各写两条描述；以下文本和答案在推理之前固定：
+
+```json
+{
+  "scene_id": "42446540",
+  "queries": [
+    {"query_id": "diamond_01", "text": "a dining chair seen from behind with a dark diamond-patterned back", "target_map_ids": [2]},
+    {"query_id": "diamond_02", "text": "a tall gray chair back with black diamond motifs", "target_map_ids": [2]},
+    {"query_id": "leaf_01", "text": "a side view of a dining chair with a black leaf-patterned seat", "target_map_ids": [7]},
+    {"query_id": "leaf_02", "text": "a chair with a leaf-patterned cushion and curved metal legs", "target_map_ids": [7]}
+  ]
+}
+```
+
+从项目根目录运行。编码只做一次；全视角直接聚合，首视角先为每个 ID 选最早一帧再聚合。两份库都必须保留 8 个原始候选，包括错分和混合候选。最后两条用同一份查询表各写一组逐条报告：
+
+```powershell
+conda activate grounded_sam
+python -m scripts.encode_instance_views --views outputs/stage05_c_42446540_views/views.json --output outputs/stage05_c_42446540_features
+python -m scripts.aggregate_instance_features --features outputs/stage05_c_42446540_features/features.json --output outputs/stage05_c_42446540_multi_instances
+python -m experiments.make_first_view_features --features outputs/stage05_c_42446540_features/features.json --output outputs/stage05_c_42446540_first_inputs
+python -m scripts.aggregate_instance_features --features outputs/stage05_c_42446540_first_inputs/features.json --output outputs/stage05_c_42446540_first_instances
+python -m scripts.evaluate_retrieval --features outputs/stage05_c_42446540_first_instances/instance_features.json --queries experiments/fixtures/stage05_queries_42446540.json --output outputs/stage05_c_42446540_eval_first
+python -m scripts.evaluate_retrieval --features outputs/stage05_c_42446540_multi_instances/instance_features.json --queries experiments/fixtures/stage05_queries_42446540.json --output outputs/stage05_c_42446540_eval_multi
+```
+
+验收：两库都是 `(8, 768)`，两组报告各有 4 条（2 个真实目标）。对照每条的 `target_rank` 和 `top1_map_id`，区分「把 A 当成 B」和「被包含相同画面内容的餐桌框吸引」两类错误；遮挡椅的漏分单独记作上游失败。仅当实测排名变化才报告检索差异。
+
+#### 42446540 对照实测
+
+核对了学习者落盘的两组报告与固定查询表。编码矩阵为 `(11, 768)`，两组候选矩阵均为 `(8, 768)`；按源索引复算，首视角确为每个 ID 的最早帧，两个条件中只有 ID 1 与 ID 2 的特征变化。两组 Top-1 都是 4/4、MRR 都是 1.0，四条正确目标的名次均为 1，预测第一名 ID 均为 `[2, 2, 7, 7]`。两条 ID 2 查询的首位相似度有小幅变化，不对应排名收益，也无法从保存的报告推断与第二名的分差。三场景小规模验收及遮挡失败案例见[报告](../reports/stage05_retrieval_comparison.md#第二个留出场景42446540)。
