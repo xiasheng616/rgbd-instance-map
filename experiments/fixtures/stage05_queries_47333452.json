@@ -1,0 +1,13 @@
+{
+  "scene_id": "47333452",
+  "queries": [
+    {"query_id": "gray_chair_01", "text": "a gray perforated chair", "target_map_ids": [2]},
+    {"query_id": "gray_chair_02", "text": "a chair with a gray seat and white legs", "target_map_ids": [2]},
+    {"query_id": "white_chair_01", "text": "a white chair with a perforated seat", "target_map_ids": [7]},
+    {"query_id": "white_chair_02", "text": "a white chair beside the stove", "target_map_ids": [7]},
+    {"query_id": "bed_01", "text": "a bed with a dark blue blanket", "target_map_ids": [4, 8]},
+    {"query_id": "bed_02", "text": "a bed with pink patterned bedding", "target_map_ids": [4, 8]},
+    {"query_id": "fridge_01", "text": "a cream-colored refrigerator", "target_map_ids": [5, 6]},
+    {"query_id": "fridge_02", "text": "a refrigerator with pink stickers", "target_map_ids": [5, 6]}
+  ]
+}

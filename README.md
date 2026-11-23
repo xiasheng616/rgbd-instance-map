@@ -4,6 +4,8 @@
 
 当前已跑通从 RGB-D 到同一场景内两个真实物体的文本检索：用三帧椅子和一帧床构建两个地图实例，查询句从椅子换成床时，Top-1 也切换到正确的实例。[查看实测与演示](#第四关双实例文本检索运行)。第一至第三关保留了已知位姿融合、ICP 漂移分析和跨帧关联对照。
 
+第五关把评估迁移到另一个访次的场景，固定 8 个候选和 8 条查询对照首视角与多视角，并记录重复地图 ID 和误分类。[查看留出场景对照](#第五关留出场景检索对照运行)。
+
 ![第一关：已知位姿融合地图与所选帧的相机中心轨迹](assets/stage01_map_trajectory.png)
 
 图中红色折线连接所选帧的参考相机中心；地图与轨迹使用相同世界坐标系。此图展示提供位姿下的融合，不代表独立估计的轨迹。
@@ -33,6 +35,8 @@ RGB-D 与相机参数 → 时间关联与反投影 → 多帧几何对齐 → �
 - [第三关 C：跨帧关联与体素重叠对照](docs/STAGE_03.md#c-跨帧关联与实例融合)
 - [第四关：多视角特征与文本检索](docs/STAGE_04.md)
 - [第四关双实例检索验收记录](reports/stage04_text_retrieval.md)
+- [第五关：批量检索评估与多视角对照](docs/STAGE_05.md)
+- [第五关：两场景实测与地图失败案例](reports/stage05_retrieval_comparison.md)
 
 核心算法由学习者实现；可以调用图像读写、四元数转换、KD-tree、SVD 和点云显示等底层工具。助手协助解释、审查、调试、命令行入口整理和展示材料。
 
@@ -238,6 +242,43 @@ python -m scripts.query_instance_map --features outputs/stage04_retrieval_instan
 | `a photo of a bed` | 床 · ID 1 · 0.134168 | 椅子 · ID 2 · 0.039231 |
 
 分数是余弦相似度，不是置信概率。该实验只验证单场景、两个候选的端到端排序，不衡量跨场景准确率，也不能单独判断颜色词或多视角聚合带来的收益。[实验协议与结果](reports/stage04_text_retrieval.md) · [ARKitScenes 数据许可](https://github.com/apple-aiml-research/ARKitScenes/blob/main/LICENSE)
+
+## 第五关：批量检索评估运行
+
+复用第四关生成的两实例特征库、SigLIP 2 本地权重和[固定查询表](experiments/fixtures/stage05_queries.json)。在项目根目录运行：
+
+```powershell
+conda activate grounded_sam
+python -m experiments.check_retrieval_metrics
+python -m scripts.evaluate_retrieval --features outputs/stage04_retrieval_instances/instance_features.json --queries experiments/fixtures/stage05_queries.json --output outputs/stage05_retrieval_a
+```
+
+输出 `per_query.json` 和 `summary.json`，分别记录每条查询的正确目标名次和汇总指标。场景 `47333462` 的 6 条查询针对两个候选，实测 Top-1 = 1.0、MRR = 1.0；乱序三候选验收的正确目标名次为 `[1, 2, 3]`，独立核算 Top-1 = 1/3、MRR = 11/18。当前是开发场景的流程验收，不能据此推断多视角优于单视角。[第五关说明](docs/STAGE_05.md)
+
+## 第五关：首视角与多视角对照运行
+
+复用第四关的逐视角缓存。在项目根目录的 `grounded_sam` 环境依次运行：先为每个实例选最早帧，再生成首视角实例库，最后用与多视角相同的查询评估。
+
+```powershell
+python -m experiments.make_first_view_features --features outputs/stage04_retrieval_features/features.json --output outputs/stage05_first_view_inputs
+python -m scripts.aggregate_instance_features --features outputs/stage05_first_view_inputs/features.json --output outputs/stage05_first_view_instances
+python -m scripts.evaluate_retrieval --features outputs/stage05_first_view_instances/instance_features.json --queries experiments/fixtures/stage05_queries.json --output outputs/stage05_retrieval_first
+```
+
+将最后一步的 `per_query.json` 与 `outputs/stage05_retrieval_a/` 的多视角报告按 `query_id` 对齐。实测两组均为 Top-1 = 1.0、MRR = 1.0，6 条查询的目标名次均未变化。床原本就只有一帧，实际改变的是椅子（首帧与三帧聚合）；这组数据没有观察到排名收益，不能推广为多视角普遍无效。[对照协议与实测](docs/STAGE_05.md#b-首视角与多视角对照)
+
+## 第五关：留出场景检索对照运行
+
+场景 `47333452` 与开发场景访次不同。按[第五关 C](docs/STAGE_05.md#c-迁移到未调参的场景)准备选帧、两份实例特征库和固定查询表，再从项目根目录的 `grounded_sam` 环境运行：
+
+```powershell
+python -m scripts.evaluate_retrieval --features outputs/stage05_c_47333452_first_instances/instance_features.json --queries experiments/fixtures/stage05_queries_47333452.json --output outputs/stage05_c_47333452_eval_first
+python -m scripts.evaluate_retrieval --features outputs/stage05_c_47333452_multi_instances/instance_features.json --queries experiments/fixtures/stage05_queries_47333452.json --output outputs/stage05_c_47333452_eval_multi
+```
+
+![留出场景中首视角与全视角的预测地图 ID 对照](assets/stage05_retrieval_comparison.png)
+
+两组均为 Top-1 **8/8**、MRR **1.0**。唯一的第一名 ID 变化为冰箱 `5 → 6`；两者在评分前就已标为同一台冰箱的正确 ID，物体级名次不变。原始 8 个地图 ID 未删减，包含重复和误标。这里验证已入库候选的检索，不是检测召回、地图质量或跨场景泛化指标。[逐条结果与限制](reports/stage05_retrieval_comparison.md)
 
 ## 基础环境
 

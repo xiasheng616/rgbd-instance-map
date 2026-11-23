@@ -1,0 +1,11 @@
+{
+  "scene_id": "47333462",
+  "queries": [
+    {"query_id": "chair_01", "text": "a photo of a blue office chair", "target_map_id": 2},
+    {"query_id": "bed_01", "text": "a photo of a bed", "target_map_id": 1},
+    {"query_id": "chair_02", "text": "a photo of an office chair with wheels", "target_map_id": 2},
+    {"query_id": "chair_03", "text": "a photo of a swivel chair", "target_map_id": 2},
+    {"query_id": "bed_02", "text": "a photo of a mattress on a bed frame", "target_map_id": 1},
+    {"query_id": "bed_03", "text": "a piece of bedroom furniture for sleeping", "target_map_id": 1}
+  ]
+}

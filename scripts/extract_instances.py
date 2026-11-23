@@ -5,18 +5,29 @@ import cv2 as cv
 import numpy as np
 from rgbd_map.geometry import transform_points
 import open3d as o3d
+import argparse
 
 
 
-mask_dir = Path(r"E:\shixi\rgbd_instance_map\outputs\stage03_bed_masks")
-output_dir = Path("outputs/stage03_bed_observations")
+
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--scene", type=Path, required=True)
+parser.add_argument("--masks", type=Path, required=True)
+parser.add_argument("--output", type=Path, required=True)
+parser.add_argument("--show", action="store_true")
+args = parser.parse_args()
+
+
+scene_dir = args.scene
+mask_dir = args.masks
+output_dir = args.output
+
 
 with (mask_dir / "results.json").open("r", encoding="utf-8") as f:
     report = json.load(f)
 
-scene_dir = Path(
-    r"E:\shixi\rgbd_instance_map\data\arkitscenes\raw\Training\47333462"
-)
 
 pose_timestamps, T_wc_all = read_trajectory(
     scene_dir / "lowres_wide.traj"
@@ -114,7 +125,8 @@ for image_info in report["images"]:
         if not o3d.io.write_point_cloud(str(output_dir / f"{image_path.stem}_{object_id}.ply"), pcd):
             raise OSError("点云保存失败")
 
-        o3d.visualization.draw_geometries([pcd], window_name="Reference")
+        if args.show:
+            o3d.visualization.draw_geometries([pcd], window_name="Reference")
 
 
 
